@@ -9,7 +9,6 @@ from numpy.linalg import lstsq
 from decimal import Decimal
 ccd_char='ccd_characteristics.txt'
 
-wd=50
 def parseargs(argv=None):
     '''
     Options parser
@@ -19,6 +18,7 @@ def parseargs(argv=None):
     parser.add_argument("basename",nargs='?', type=str,action="store",
                               help="location of fits files")
     parser.add_argument("-o",dest = "ccd_char",action="store_true",default='ccd_characteristics.txt', help= "Output file")
+    parser.add_argument("-wd",dest = "wd",default='50', help= "Window size of columns/rows to add estimate CTE")
     args = parser.parse_args(args=argv)
 
     if args.basename is None:
@@ -46,6 +46,7 @@ def main(argv=None):
     CTE = {'LL': [0,0], 'RL': [0,0],'LU':[0,0],'RU':[0,0]}
     ka_peak={'LL': [], 'RL': [],'LU':[],'RU':[]}
     pos={'LL': [], 'RL': [],'LU':[],'RU':[]}
+    wd = args.wd
 
     for filename in args.filenames:
         position = filename[-11:-9]
