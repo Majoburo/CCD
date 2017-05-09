@@ -2,13 +2,14 @@ import glob
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import convolve
 from astropy.io import fits
 import scipy.signal as sig
 from numpy.linalg import lstsq
 from decimal import Decimal
 ccd_char='ccd_characteristics.txt'
 
-
+wd=50
 def parseargs(argv=None):
     '''
     Options parser
@@ -62,7 +63,7 @@ def main(argv=None):
         peak = peaks[np.argmax([counts[peak] for peak in peaks])]
         pdata[posicion],pcounts[posicion] = data[peak],counts[peak]
         plt.semilogy(pdata[posicion],pcounts[posicion],markersize=3,marker='o', color='r')
-        plt.annotate('H_alpha', xy=(pdata[posicion], pcounts[posicion]))
+        plt.annotate('K_alpha', xy=(pdata[posicion], pcounts[posicion]))
         plt.title('CCD counts per DU')
         plt.ylabel('Counts')
         plt.xlabel('Signal,DU')
@@ -70,21 +71,23 @@ def main(argv=None):
         plt.semilogy(data,counts)
         plt.savefig('plots/sig'+posicion+'.png')
         plt.show()
-        print('Averaging over all pixels, H_alpha peak of %s in ND units should be: %4.1f'%(posicion,pdata[posicion]))
+        print('Averaging over all pixels, K_alpha peak of %s in ND units should be: %4.1f'%(posicion,pdata[posicion]))
         print('Bias:%4.1f'%data[list(counts).index(np.amax(counts))])
-        biastot[posicion]=data[list(counts).index(np.amax(counts))]
-        halpha = pdata[posicion]-biastot[posicion]
-        gain[posicion] = 1620./halpha
-        print('Peak minus offset is:%4.1f'%(halpha))
-        print('H_alpha photons produce 1620 electrons, the gain is therefore:%2.2f'%gain[posicion])
+        biastot[posicion] = data[list(counts).index(np.amax(counts))]
+        #biastot = {'RL': 2328.7055833333334, 'RU': 2558.4873849999999, 'LL': 937.34572833333334, 'LU': 450.96781499999997}
+        kalpha = pdata[posicion] - biastot[posicion]
+        gain[posicion] = 1620./kalpha
+        print('Peak minus offset is:%4.1f'%(kalpha))
+        print('K_alpha photons produce 1620 electrons, the gain is therefore:%2.4f'%gain[posicion])
         print('RMS in electrons from the overscan is %3.3f'%(np.std(f[0].data[:,2070:2128])*gain[posicion]))
     
     for posicion in ccd:
-        for row in xrange(len(pos['LL'][0,0,:2040])-10):
-            data,counts = np.unique(pos[posicion][:,:,row:row+10],return_counts=True)
+        for row in xrange(len(pos['LL'][0,0,:2040])-wd):
+            data,counts = np.unique(pos[posicion][:,:,row:row+wd],return_counts=True)
             bias = data[list(counts).index(np.amax(counts))]
             temp  = pdata[posicion]
             skip=False
+            idx = (np.abs(data - temp)).argmin()
             while not temp in data:
                 temp -=1
                 if (pdata[posicion]-temp) >100:
@@ -93,9 +96,12 @@ def main(argv=None):
             if skip:
                 continue
             peak = data.tolist().index(temp)
-
-            data,counts = data[peak-300:peak+300]-bias,counts[peak-300:peak+300]
-            counts = np.convolve(counts,sig.gaussian(20, std=3),mode='same')
+            #print data[idx],temp
+            #plt.plot(data[peak-300:peak+300]-bias,counts[peak-300:peak+300])
+            #plt.show()
+            data,counts = data[peak-50:peak+50],counts[peak-50:peak+50]
+            #counts = np.convolve(counts,sig.gaussian(20, std=3),mode='same')
+            counts = convolve(counts, sig.gaussian(20,std=wd/3), mode='same')
             temppdata = data[np.argmax(counts)]
             ka_peak[posicion].append(temppdata)
     for posicion in ccd:
@@ -105,7 +111,7 @@ def main(argv=None):
         A = np.vstack([x, np.ones(len(x))]).T
         m, c = lstsq(A, y)[0]
         plt.plot(x, m*x + c, 'r', label='Fitted line')
-        plt.title('H_alpha peaks, bias substracted per col')
+        plt.title('K_alpha peaks, bias substracted per col')
         plt.ylabel('Signal, DU')
         plt.xlabel('column')
         plt.savefig('plots/col_sig'+posicion+'.png')
@@ -116,8 +122,8 @@ def main(argv=None):
     
     ka_peak={'LL': [], 'RL': [],'LU':[],'RU':[]}
     for posicion in ccd:
-        for row in xrange(len(pos['LL'][0,:,0])-10):
-            data,counts = np.unique(pos[posicion][:,row:row+10,:2040],return_counts=True)
+        for row in xrange(len(pos['LL'][0,:,0])-wd):
+            data,counts = np.unique(pos[posicion][:,row:row+wd,:2040],return_counts=True)
             bias = data[list(counts).index(np.amax(counts))]
             temp  = pdata[posicion]
             skip=False
@@ -129,18 +135,18 @@ def main(argv=None):
             if skip:
                 continue
             peak = data.tolist().index(temp)
-            data,counts = data[peak-300:peak+300]-bias,counts[peak-300:peak+300]
-            counts = np.convolve(counts,sig.gaussian(20, std=3),mode='same')
+            data,counts = data[peak-50:peak+50]-bias,counts[peak-50:peak+50]
+            counts = np.convolve(counts,sig.gaussian(20, std=wd/3),mode='same')
             temppdata = data[np.argmax(counts)]
             ka_peak[posicion].append(temppdata)
     for posicion in ccd:
-        plt.plot(ka_peak[posicion], markersize=1,marker='o', color='r', ls='')
-        x=np.arange(len(ka_peak[posicion]))
-        y=np.array(ka_peak[posicion])
+        plt.plot(ka_peak[posicion], markersize = 1, marker = 'o', color = 'r', ls = '')
+        x = np.arange(len(ka_peak[posicion]))
+        y = np.array(ka_peak[posicion])
         A = np.vstack([x, np.ones(len(x))]).T
         m, c = lstsq(A, y)[0]
         plt.plot(x, m*x + c, 'r', label='Fitted line')
-        plt.title('H_alpha peaks, bias substracted per row')
+        plt.title('K_alpha peaks, bias substracted per row')
         plt.ylabel('Signal, DU')
         plt.xlabel('row')
         plt.savefig('plots/row_sig'+posicion+'.png')
