@@ -18,7 +18,7 @@ def parseargs(argv=None):
     parser.add_argument("basename",nargs='?', type=str,action="store",
                               help="location of fits files")
     parser.add_argument("-o",dest = "ccd_char",action="store_true",default='ccd_characteristics.txt', help= "Output file")
-    parser.add_argument("-wd",dest = "wd",default='50', help= "Window size of columns/rows to add estimate CTE")
+    parser.add_argument("-wd",type=int, dest = "wd",default='50', help= "Window size of columns/rows to add estimate CTE")
     args = parser.parse_args(args=argv)
 
     if args.basename is None:
