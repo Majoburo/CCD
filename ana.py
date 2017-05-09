@@ -26,7 +26,6 @@ def parseargs(argv=None):
         parser.error(msg)
     else:
 
-        args.fitsfiles = []
         searchname = args.basename + '*/camra/*.fits'
         filenames = glob.glob(searchname)
         if not filenames:
@@ -34,7 +33,6 @@ def parseargs(argv=None):
             parser.error(msg)
         else:
             args.filenames = filenames
-            args.fitsfiles = [fits.open(filenames[i])[0] for i in xrange(len(filenames))] 
     return args
 
 
@@ -89,20 +87,10 @@ def main(argv=None):
             temp  = pdata[posicion]
             skip=False
             idx = (np.abs(data - temp)).argmin()
-            while not temp in data:
-                temp -=1
-                if (pdata[posicion]-temp) >100:
-                    skip = True
-                    continue
-            if skip:
+            if abs(temp - data[idx]) > 100 or len(counts)==0:
                 continue
-            peak = data.tolist().index(temp)
-            #print data[idx],temp
-            #plt.plot(data[peak-300:peak+300]-bias,counts[peak-300:peak+300])
-            #plt.show()
-            data,counts = data[peak-50:peak+50],counts[peak-50:peak+50]
-            #counts = np.convolve(counts,sig.gaussian(20, std=3),mode='same')
-            counts = convolve(counts, sig.gaussian(20,std=wd/3), mode='same')
+            data,counts = data[idx-100:idx+100],counts[idx-100:idx+100]
+            counts = convolve(counts, sig.gaussian(wd,std=wd/3), mode='same')
             temppdata = data[np.argmax(counts)]
             ka_peak[posicion].append(temppdata)
     for posicion in ccd:
@@ -128,16 +116,11 @@ def main(argv=None):
             bias = data[list(counts).index(np.amax(counts))]
             temp  = pdata[posicion]
             skip=False
-            while not temp in data:
-                temp -=1
-                if (pdata[posicion]-temp) >100:
-                    skip = True
-                    continue
-            if skip:
+            idx = (np.abs(data - temp)).argmin()
+            if abs(temp - data[idx]) > 100 or len(counts)==0:
                 continue
-            peak = data.tolist().index(temp)
-            data,counts = data[peak-50:peak+50]-bias,counts[peak-50:peak+50]
-            counts = np.convolve(counts,sig.gaussian(20, std=wd/3),mode='same')
+            data,counts = data[idx-100:idx+100],counts[idx-100:idx+100]
+            counts = np.convolve(counts,sig.gaussian(wd, std=wd/3),mode='same')
             temppdata = data[np.argmax(counts)]
             ka_peak[posicion].append(temppdata)
     for posicion in ccd:
